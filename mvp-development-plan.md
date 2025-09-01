@@ -108,6 +108,128 @@ This document outlines the development plan for Budget Lens MVP, a lean implemen
 - Extensible filter and sort inputs
 - Subscription support for real-time updates
 
+### DevOps and Deployment Strategy
+
+To mitigate risks associated with a last-minute "big bang" deployment, this plan incorporates an iterative DevOps strategy from the beginning.
+
+- **Infrastructure as Code (IaC):** All cloud infrastructure (e.g., databases, app services, networking) will be defined using a declarative IaC tool (e.g., Terraform, Bicep). This ensures environments are repeatable, auditable, and easy to manage.
+- **Database Migration Strategy:** Automated schema migrations integrated into CI/CD pipeline with rollback capability:
+  - **Development:** Entity Framework migrations applied automatically on application startup
+  - **Staging:** Migrations executed as part of deployment pipeline before application deployment
+  - **Production:** Migration validation step with manual approval gate, automated rollback procedures, and zero-downtime deployment patterns
+  - **Migration Testing:** All migrations tested in staging environment with production-like data volumes
+- **CI/CD Pipeline:** A continuous integration and continuous deployment pipeline will be established in Week 1 using GitHub Actions (or a similar tool).
+  - **Continuous Integration:** On every pull request, the pipeline will automatically:
+        1. Build the .NET solution.
+        2. Run all unit and integration tests.
+        3. Execute database migration validation against test database.
+        4. Report status back to the PR.
+  - **Continuous Deployment:** On every merge to the `main` branch, the pipeline will automatically deploy the application to the `Staging` environment. Deployment to `Production` will be a manually triggered step after successful staging validation.
+- **Environments:** Three distinct environments will be maintained:
+  - **Development:** Local developer machines with Docker Compose PostgreSQL.
+  - **Staging:** A production-like environment for automated deployments and user acceptance testing.
+  - **Production:** The live environment for end-users with high availability configuration.
+- **Monitoring and Logging:** A structured logging, monitoring, and alerting solution (e.g., OpenTelemetry with Azure Monitor/Datadog) will be configured from the start. This ensures immediate visibility into application health in all environments.
+
+### Testing and Quality Assurance Strategy
+
+A multi-layered testing strategy is critical for maintaining quality and development velocity within a Hexagonal Architecture. All tests will be integrated into the CI/CD pipeline.
+
+- **Level 1: Unit Tests (xUnit)**
+  - **Scope:** Focused on the **Domain Layer** and **Application Layer**.
+  - **Domain:** Test aggregate business logic, domain events, and value object invariants in complete isolation. No external dependencies (no database, no network).
+  - **Application:** Test CQRS command/query handlers by mocking repository and service interfaces (`IAccountRepository`, `IUnitOfWork`, etc.).
+  - **Goal:** Achieve >90% code coverage on core business logic. These tests should be extremely fast.
+
+- **Level 2: Integration Tests**
+  - **Scope:** Focused on the **Infrastructure Layer** and validating application logic against real dependencies.
+  - **Infrastructure:** Test repository implementations against a real, containerized PostgreSQL database to verify data access logic and EF Core mappings.
+  - **Application:** Test the full MediatR pipeline for key commands/queries, ensuring they integrate correctly with the database and other infrastructure components.
+  - **Goal:** Ensure adapters work as expected and validate logic against real-world dependencies.
+
+- **Level 3: End-to-End (E2E) Tests**
+  - **Scope:** Focused on the **API Layer**.
+  - **Method:** Tests will be written from the perspective of a client application. They will send real GraphQL queries and mutations to an in-memory test server (`HotChocolate.AspNetCore.Tests`) running the full application stack against a test database.
+  - **Goal:** Verify that critical user flows (e.g., creating a user, adding a transaction, and seeing a budget update) work correctly through the entire system.
+
+- **Level 4: Performance Testing (k6)**
+  - **Scope:** Load and performance validation of GraphQL API endpoints under realistic usage patterns.
+  - **Tool:** k6 for JavaScript-based performance testing with GraphQL support.
+  - **Test Scenarios:**
+    - **Baseline Load:** 50 concurrent users performing typical operations (login, view accounts, add transactions)
+    - **Peak Load:** 200 concurrent users simulating high-traffic periods
+    - **Stress Test:** 500+ concurrent users to identify breaking points
+    - **Endurance Test:** 100 concurrent users over 30 minutes to detect memory leaks
+  - **Performance Targets:**
+    - **API Response Time:** <200ms for 95th percentile under baseline load
+    - **GraphQL Query Performance:** <100ms for simple queries, <500ms for complex aggregations
+    - **Database Performance:** <50ms average query execution time
+    - **Throughput:** >1000 requests per minute sustained
+  - **k6 Test Structure:**
+
+        ```javascript
+        // Example k6 test for Budget Lens GraphQL API
+        import http from 'k6/http';
+        import { check } from 'k6';
+        import { Rate } from 'k6/metrics';
+
+        export let errorRate = new Rate('errors');
+        export let options = {
+          scenarios: {
+            baseline: {
+              executor: 'constant-vus',
+              vus: 50,
+              duration: '5m',
+            },
+            peak: {
+              executor: 'ramping-vus',
+              startVUs: 0,
+              stages: [
+                { duration: '2m', target: 200 },
+                { duration: '5m', target: 200 },
+                { duration: '2m', target: 0 },
+              ],
+            },
+          },
+        };
+        ```
+
+  - **GraphQL Performance Scenarios:**
+    - User authentication and profile queries
+    - Account balance and transaction history retrieval
+    - Budget performance calculations
+    - Real-time subscription load testing
+    - Complex filtering and pagination queries
+
+- **Level 5: Security Testing**
+  - **Scope:** Comprehensive security validation for financial application requirements.
+  - **OWASP Dependency Scanning:**
+    - **Tool:** OWASP Dependency-Check integrated into CI pipeline
+    - **Scope:** Scan all .NET packages and JavaScript dependencies for known vulnerabilities
+    - **Frequency:** Every build and weekly scheduled scans
+    - **Action:** Block deployment if high/critical vulnerabilities found
+  - **GraphQL-Specific Security Testing:**
+    - **Query Depth Limiting:** Validate protection against deeply nested queries (max depth: 10)
+    - **Query Complexity Analysis:** Test protection against expensive queries (max complexity: 1000)
+    - **Rate Limiting:** Validate API rate limiting (100 requests/minute per user)
+    - **Authorization Testing:** Verify users can only access their own financial data
+    - **Input Validation:** Test GraphQL input sanitization and validation
+  - **Authentication & Authorization Testing:**
+    - **JWT Token Security:** Validate token expiration, rotation, and blacklisting
+    - **Password Security:** Test password strength requirements and hashing (bcrypt)
+    - **Session Management:** Verify secure session handling and timeout policies
+    - **Multi-tenancy Security:** Test data isolation between users
+  - **Financial Data Protection:**
+    - **Data Encryption:** Verify sensitive data encryption at rest (AES-256)
+    - **PCI DSS Compliance:** Ensure no storage of full credit card numbers
+    - **Audit Trail Security:** Validate event store tamper protection
+    - **Data Export Security:** Test CSV/PDF export authorization and data masking
+  - **Infrastructure Security:**
+    - **TLS Configuration:** Verify TLS 1.3 encryption for all API communications
+    - **Database Security:** Test PostgreSQL connection security and access controls
+    - **Environment Secrets:** Validate proper secret management (Azure Key Vault/AWS Secrets Manager)
+    - **Container Security:** Scan Docker images for vulnerabilities
+
 ---
 
 ## Future-Proofing Strategy
@@ -315,16 +437,19 @@ public record TransactionCreatedEvent_V2(
 - [ ] PostgreSQL database with extensible schema (defined above)
 - [ ] HotChocolate GraphQL server setup
 - [ ] MediatR CQRS pipeline configuration
+- [ ] **DevOps:** Initial CI/CD pipeline established (build, unit/integration test execution)
+- [ ] **DevOps:** Staging environment provisioned using Infrastructure as Code (IaC)
+- [ ] **DevOps:** Basic logging and monitoring configured and integrated
+- [ ] **Testing:** Testing frameworks setup (TUnit for Unit/Integration)
 - [ ] Basic authentication system (email/password)
 - [ ] Domain event infrastructure
-- [ ] Unit test framework setup
 
 *Architecture Validation:*
 
-- [ ] All aggregates have proper domain event handling
-- [ ] Command/Query separation working through MediatR
+- [ ] CI pipeline passes on every commit
+- [ ] Database migrations are automatically applied in the staging environment
 - [ ] GraphQL schema validation and error handling
-- [ ] Database migrations working correctly
+- [ ] Command/Query separation working through MediatR
 
 **Week 3-4: User & Account Management**
 
@@ -420,23 +545,39 @@ public record TransactionCreatedEvent_V2(
 - [ ] Data export works correctly for all date ranges
 - [ ] Mobile-responsive design
 
-**Week 13-14: Testing & Deployment**
+**Week 13-14: Hardening, Testing & Deployment**
 
 *Deliverables:*
 
-- [ ] Comprehensive integration test suite
-- [ ] Performance testing and optimization
-- [ ] Security testing and hardening
-- [ ] Production deployment pipeline
-- [ ] Monitoring and logging setup
-- [ ] User acceptance testing
+- [ ] **E2E Testing:** Complete test suite covering all critical user flows (registration, account management, transaction processing, budgeting)
+- [ ] **Unit/Integration Testing:** Achieve >90% code coverage for domain logic and >80% for application layer
+- [ ] **Performance Testing (k6):** Execute comprehensive load testing scenarios:
+  - [ ] Baseline load testing (50 concurrent users for 5 minutes)
+  - [ ] Peak load testing (200 concurrent users with ramp-up/ramp-down)
+  - [ ] Stress testing (500+ concurrent users to identify breaking points)
+  - [ ] Endurance testing (100 concurrent users for 30 minutes)
+  - [ ] GraphQL-specific performance validation (query complexity, subscription load)
+- [ ] **Security Testing:** Complete security validation:
+  - [ ] OWASP dependency scanning with zero high/critical vulnerabilities
+  - [ ] GraphQL security testing (depth limits, complexity analysis, rate limiting)
+  - [ ] Authentication/authorization testing (JWT security, multi-tenancy isolation)
+  - [ ] Financial data protection validation (encryption, PCI compliance, audit security)
+  - [ ] Infrastructure security verification (TLS, database security, secret management)
+- [ ] **DevOps:** Harden production deployment pipeline with automated rollback procedures
+- [ ] **Monitoring:** Finalize production monitoring dashboards, alerting rules, and log analysis queries
+- [ ] **Database:** Validate production migration procedures with staging data
+- [ ] **UAT:** Complete User Acceptance Testing in staging environment
 
 *Success Criteria:*
 
-- [ ] All critical user flows tested end-to-end
-- [ ] Performance meets targets (<200ms API responses)
-- [ ] Security vulnerabilities addressed
-- [ ] Production deployment successful
+- [ ] All critical user flows pass E2E automation (100% success rate)
+- [ ] Performance targets achieved: <200ms API responses at 95th percentile under baseline load
+- [ ] k6 performance tests demonstrate system can handle 200 concurrent users with <5% error rate
+- [ ] Zero critical or high security vulnerabilities in security scan results
+- [ ] GraphQL API demonstrates proper protection against malicious queries
+- [ ] Production deployment completed successfully with monitoring fully operational
+- [ ] Database migrations execute without data loss or extended downtime
+- [ ] UAT completion with stakeholder sign-off on core functionality
 
 ---
 
@@ -720,6 +861,11 @@ extend type Query {
 | **Risk** | **Impact** | **Probability** | **Mitigation Strategy** | **Reference** |
 |----------|------------|-----------------|-------------------------|---------------|
 | **Complex architecture slows initial development** | High | Medium | Smart interface design, delayed optimization | Architecture patterns from [architecture.md](./architecture.md#hexagonal-architecture-implementation) |
+| **Deployment or environment issues delay launch** | High | Medium | Establish CI/CD pipeline and multiple environments from Week 1. Use Infrastructure as Code for repeatability. | DevOps and Deployment Strategy |
+| **Performance issues under load** | High | Medium | Comprehensive k6 load testing with GraphQL-specific scenarios, database optimization | Level 4: Performance Testing section |
+| **Security vulnerabilities in financial app** | Critical | Medium | Multi-layer security testing including OWASP scanning, GraphQL security, and financial data protection | Level 5: Security Testing section |
+| **Database migration failures in production** | High | Low | Automated migration testing in staging, rollback procedures, zero-downtime patterns | Database Migration Strategy |
+| **Bugs and regressions slow down development** | Medium | High | Implement a multi-layered testing strategy (Unit, Integration, E2E) integrated into the CI pipeline to catch issues early. | Testing and Quality Assurance Strategy |
 | **GraphQL schema breaking changes** | Medium | Low | Interface-based polymorphic types, schema versioning | Schema evolution strategy above |
 | **Database performance with events** | Medium | Medium | Proper indexing, materialized views for analytics | Event store optimization from [architecture.md](./architecture.md#database-performance-considerations) |
 | **Authentication/authorization complexity** | High | Medium | Simple email/password initially, OAuth interfaces ready | Security requirements from [PRD Section 4.3](./prd.md#security-requirements) |
