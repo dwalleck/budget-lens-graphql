@@ -1,0 +1,57 @@
+<Project>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <WarningsAsErrors />
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningsNotAsErrors>CS1998;NU1603</WarningsNotAsErrors>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <!-- Package Versions -->
+  <PropertyGroup>
+    <MediatRVersion>12.4.1</MediatRVersion>
+    <OneOfVersion>3.0.271</OneOfVersion>
+    <FluentValidationVersion>11.11.0</FluentValidationVersion>
+    <SerilogVersion>4.1.0</SerilogVersion>
+    <HotChocolateVersion>15.1.0</HotChocolateVersion>
+    <EntityFrameworkVersion>10.0.0-preview.5.25272.3</EntityFrameworkVersion>
+    <PostgresVersion>10.0.0-preview.5.25272.3</PostgresVersion>
+    <XunitVersion>2.9.2</XunitVersion>
+    <TestSdkVersion>17.12.0</TestSdkVersion>
+  </PropertyGroup>
+
+  <!-- Assembly Information -->
+  <PropertyGroup>
+    <Product>Budget Lens</Product>
+    <Company>Budget Lens</Company>
+    <Copyright>Copyright © Budget Lens 2025</Copyright>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <!-- Code Analysis -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)budget-lens.ruleset</CodeAnalysisRuleSet>
+  </PropertyGroup>
+
+  <!-- Common Package References removed to fix version conflicts -->
+
+  <!-- Test Projects -->
+  <ItemGroup Condition="$(MSBuildProjectName.Contains('Tests'))">
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="$(TestSdkVersion)" />
+    <PackageReference Include="xunit" Version="$(XunitVersion)" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+    <PackageReference Include="FluentAssertions" Version="6.12.2" />
+    <PackageReference Include="NSubstitute" Version="5.3.0" />
+  </ItemGroup>
+
+</Project>
