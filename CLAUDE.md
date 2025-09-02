@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with the Budget Lens personal finance management platform.
 
+## Development directions that must be followed
+
+- Always use the `dotnet` command to create new projects, or add packages and project references. Do not modify the csproj file directly unless you must
+
 ## Product Overview
 
 Budget Lens is a comprehensive personal finance management platform that empowers individuals and families to take control of their financial lives through:
