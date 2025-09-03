@@ -16,11 +16,13 @@ public class EventStore : IEventStore
     private readonly BudgetLensDbContext _context;
     private readonly ILogger<EventStore> _logger;
     private readonly JsonSerializerOptions _jsonOptions;
+    private readonly EventTypeRegistry _eventTypeRegistry;
 
     public EventStore(BudgetLensDbContext context, ILogger<EventStore> logger)
     {
         _context = context;
         _logger = logger;
+        _eventTypeRegistry = new EventTypeRegistry();
         _jsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -159,19 +161,68 @@ public class EventStore : IEventStore
         return JsonSerializer.Serialize(metadata, _jsonOptions);
     }
 
+    public async Task<IEnumerable<DomainEvent>> GetEventsAsync(
+        Guid aggregateId,
+        string aggregateType,
+        CancellationToken cancellationToken = default)
+    {
+        return await LoadEventsAsync(aggregateId, cancellationToken);
+    }
+
+    public async Task<IEnumerable<DomainEvent>> GetEventsByAggregateTypeAsync(
+        string aggregateType,
+        CancellationToken cancellationToken = default)
+    {
+        _logger.LogDebug("Loading events for aggregate type {AggregateType}", aggregateType);
+
+        var storedEvents = await _context.Events
+            .Where(e => e.AggregateType == aggregateType)
+            .OrderBy(e => e.AggregateId)
+            .ThenBy(e => e.Version)
+            .ToListAsync(cancellationToken);
+
+        var domainEvents = new List<DomainEvent>();
+
+        foreach (var storedEvent in storedEvents)
+        {
+            try
+            {
+                var domainEvent = DeserializeEvent(storedEvent);
+                if (domainEvent != null)
+                {
+                    domainEvents.Add(domainEvent);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to deserialize event {EventId} of type {EventType}", 
+                    storedEvent.EventId, storedEvent.EventType);
+            }
+        }
+
+        _logger.LogDebug("Loaded {EventCount} events for aggregate type {AggregateType}", 
+            domainEvents.Count, aggregateType);
+
+        return domainEvents;
+    }
+
     private DomainEvent? DeserializeEvent(StoredEvent storedEvent)
     {
-        // This is a simplified implementation. In a real application, you would:
-        // 1. Have an event type registry
-        // 2. Use the metadata to find the correct type
-        // 3. Handle event versioning and evolution
-        
-        // For now, we'll need to implement this when we have concrete event types
-        // This method should be enhanced with proper event type resolution
-        
-        _logger.LogWarning("Event deserialization not fully implemented for event type {EventType}", 
-            storedEvent.EventType);
-        
-        return null;
+        try
+        {
+            var domainEvent = _eventTypeRegistry.DeserializeEvent(storedEvent.EventType, storedEvent.EventData);
+            if (domainEvent == null)
+            {
+                _logger.LogWarning("Failed to deserialize event type {EventType} - type not registered", 
+                    storedEvent.EventType);
+            }
+            return domainEvent;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error deserializing event {EventId} of type {EventType}", 
+                storedEvent.EventId, storedEvent.EventType);
+            return null;
+        }
     }
 }

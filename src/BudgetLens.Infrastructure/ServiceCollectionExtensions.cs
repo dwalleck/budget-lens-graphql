@@ -1,9 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Identity;
 using BudgetLens.Core.Domain.Interfaces;
 using BudgetLens.Infrastructure.Data;
 using BudgetLens.Infrastructure.EventStore;
+using BudgetLens.Infrastructure.Identity;
 
 namespace BudgetLens.Infrastructure;
 
@@ -42,6 +44,26 @@ public static class ServiceCollectionExtensions
             // Configure snake_case naming globally
             options.UseSnakeCaseNamingConvention();
         });
+
+        // Add Identity
+        services.AddIdentity<ApplicationUser, IdentityRole<Guid>>(options =>
+        {
+            // Password settings
+            options.Password.RequireDigit = true;
+            options.Password.RequireLowercase = true;
+            options.Password.RequireUppercase = true;
+            options.Password.RequireNonAlphanumeric = false;
+            options.Password.RequiredLength = 8;
+            
+            // User settings
+            options.User.RequireUniqueEmail = true;
+            options.SignIn.RequireConfirmedEmail = false; // For MVP, skip email confirmation
+        })
+        .AddEntityFrameworkStores<BudgetLensDbContext>()
+        .AddDefaultTokenProviders();
+
+        // Add JWT token service
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
 
         // Add event store
         services.AddScoped<IEventStore, EventStore.EventStore>();

@@ -2,6 +2,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\BudgetLens.Core\BudgetLens.Core.csproj" />
+    <ProjectReference Include="..\BudgetLens.Infrastructure\BudgetLens.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR" Version="13.0.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity" Version="2.3.1" />
   </ItemGroup>
 
   <PropertyGroup>

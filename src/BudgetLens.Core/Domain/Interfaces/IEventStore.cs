@@ -54,4 +54,26 @@ public interface IEventStore
     Task<int> GetAggregateVersionAsync(
         Guid aggregateId,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get events for a specific aggregate using the domain object method names.
+    /// </summary>
+    /// <param name="aggregateId">The unique identifier of the aggregate</param>
+    /// <param name="aggregateType">The type name of the aggregate</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>All events for the aggregate in order</returns>
+    Task<IEnumerable<DomainEvent>> GetEventsAsync(
+        Guid aggregateId,
+        string aggregateType,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Get events for all aggregates of a specific type.
+    /// </summary>
+    /// <param name="aggregateType">The type name of the aggregate</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>All events for the aggregate type</returns>
+    Task<IEnumerable<DomainEvent>> GetEventsByAggregateTypeAsync(
+        string aggregateType,
+        CancellationToken cancellationToken = default);
 }

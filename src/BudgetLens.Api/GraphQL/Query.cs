@@ -1,3 +1,5 @@
+using BudgetLens.Api.GraphQL.Accounts;
+
 namespace BudgetLens.Api.GraphQL;
 
 /// <summary>
@@ -16,6 +18,11 @@ public class Query
     /// </summary>
     /// <returns>API version details.</returns>
     public ApiVersion Version() => new("1.0.0", "Budget Lens MVP", DateTime.UtcNow);
+
+    /// <summary>
+    /// Account-related queries.
+    /// </summary>
+    public AccountQueries Accounts => new();
 }
 
 /// <summary>

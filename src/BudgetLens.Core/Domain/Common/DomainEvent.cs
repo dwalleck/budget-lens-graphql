@@ -19,7 +19,7 @@ public abstract record DomainEvent
     /// <summary>
     /// The user who caused this event (if applicable)
     /// </summary>
-    public Guid? UserId { get; init; }
+    public virtual Guid? UserId { get; init; }
 
     /// <summary>
     /// The type name of this event (for serialization/deserialization)

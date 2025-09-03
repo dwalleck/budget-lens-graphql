@@ -1,5 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using BudgetLens.Infrastructure.EventStore;
+using BudgetLens.Infrastructure.Identity;
 
 namespace BudgetLens.Infrastructure.Data;
 
@@ -7,7 +10,7 @@ namespace BudgetLens.Infrastructure.Data;
 /// Entity Framework DbContext for Budget Lens with PostgreSQL and event sourcing support.
 /// Uses snake_case naming convention for PostgreSQL compatibility.
 /// </summary>
-public class BudgetLensDbContext : DbContext
+public class BudgetLensDbContext : IdentityDbContext<ApplicationUser, IdentityRole<Guid>, Guid>
 {
     public BudgetLensDbContext(DbContextOptions<BudgetLensDbContext> options) : base(options)
     {
